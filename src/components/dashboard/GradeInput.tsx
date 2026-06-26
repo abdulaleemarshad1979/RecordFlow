@@ -48,8 +48,8 @@ export default function GradeInput({ value, onChange, onValidationChange }: Grad
   };
 
   return (
-    <div className="flex flex-col gap-1 w-20 relative select-none">
-      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest font-satoshi">
+    <div className="flex flex-col gap-1 w-20 relative">
+      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest font-satoshi select-none">
         Grade
       </label>
       
