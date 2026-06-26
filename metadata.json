@@ -1,0 +1,6 @@
+{
+  "name": "RecordFlow",
+  "description": "Digital lab record and assignment management platform for Indian engineering colleges.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
