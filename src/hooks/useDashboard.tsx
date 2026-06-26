@@ -10,6 +10,15 @@ import {
   subjects as mockSubjects
 } from '../data/mockData';
 
+const normalizeName = (name: string): string => {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .replace(/^(prof\.|dr\.|mr\.|mrs\.|ms\.)\s+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 interface DashboardContextType {
   isSidebarOpen: boolean;
   toggleSidebar: () => void;
@@ -122,9 +131,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             .from('submissions')
             .select('*');
 
-          if (studentsData && subsData && !sErr && !subErr) {
+            // Filter student profiles by teacher's section
+            const filteredStudentsData = (studentsData || []).filter(st => {
+              if (!st.section || !user.section) return false;
+              return st.section.toLowerCase().trim() === user.section.toLowerCase().trim();
+            });
+
             // Compile students average lists
-            const list: StudentListItem[] = studentsData.map((st) => {
+            const list: StudentListItem[] = filteredStudentsData.map((st) => {
               const studentSubs = subsData.filter((s) => s.student_id === st.id);
               const grades: { [subjectId: string]: (number | null)[] } = {};
               currentSubjects.forEach((subj) => {
@@ -146,9 +160,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
             // Pending submissions list
             const pending: PendingSubmission[] = subsData
-              .filter((s) => s.status === 'pending')
+              .filter((s) => s.status === 'pending' && normalizeName(s.faculty) === normalizeName(user.name))
               .map((s) => {
-                const matchedStudent = studentsData.find((st) => st.id === s.student_id);
+                const matchedStudent = filteredStudentsData.find((st) => st.id === s.student_id);
                 const matchedSubject = currentSubjects.find((sub) => sub.id === s.subject_id);
                 return {
                   id: s.id,
@@ -170,9 +184,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
             // Graded submissions list
             const graded: GradedSubmission[] = subsData
-              .filter((s) => s.status === 'graded')
+              .filter((s) => s.status === 'graded' && normalizeName(s.faculty) === normalizeName(user.name))
               .map((s) => {
-                const matchedStudent = studentsData.find((st) => st.id === s.student_id);
+                const matchedStudent = filteredStudentsData.find((st) => st.id === s.student_id);
                 const matchedSubject = currentSubjects.find((sub) => sub.id === s.subject_id);
                 return {
                   id: s.id,
@@ -188,12 +202,18 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
                 };
               });
             setGradedSubmissions(graded);
-          }
         } else {
+          // LocalStorage sim loading
           // LocalStorage sim loading
           const localUsers = JSON.parse(localStorage.getItem('rf_users') || '[]');
           const localSubs = JSON.parse(localStorage.getItem('rf_submissions') || '[]');
-          const studentProfiles = localUsers.filter((u: any) => u.role === 'student');
+          // Filter student profiles by teacher's section
+          const studentProfiles = localUsers
+            .filter((u: any) => u.role === 'student')
+            .filter((st: any) => {
+              if (!st.section || !user.section) return false;
+              return st.section.toLowerCase().trim() === user.section.toLowerCase().trim();
+            });
 
           const list: StudentListItem[] = studentProfiles.map((st: any) => {
             const studentSubs = localSubs.filter((s: any) => s.studentId === st.id);
@@ -215,7 +235,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           setStudents(list);
 
           const pending = localSubs
-            .filter((s: any) => s.status === 'pending')
+            .filter((s: any) => s.status === 'pending' && normalizeName(s.faculty) === normalizeName(user.name))
             .map((s: any) => {
               const student = studentProfiles.find((u) => u.id === s.studentId);
               const matchedSubject = currentSubjects.find((sub) => sub.id === s.subjectId);
@@ -238,7 +258,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           setPendingSubmissions(pending);
 
           const graded = localSubs
-            .filter((s: any) => s.status === 'graded')
+            .filter((s: any) => s.status === 'graded' && normalizeName(s.faculty) === normalizeName(user.name))
             .map((s: any) => {
               const student = studentProfiles.find((u) => u.id === s.studentId);
               const matchedSubject = currentSubjects.find((sub) => sub.id === s.subjectId);

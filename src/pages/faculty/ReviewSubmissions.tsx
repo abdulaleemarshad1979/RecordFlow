@@ -7,6 +7,15 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { PendingSubmission, GradedSubmission } from '../../data/mockData';
 
+const normalizeName = (name: string): string => {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .replace(/^(prof\.|dr\.|mr\.|mrs\.|ms\.)\s+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 export default function ReviewSubmissions() {
   const { refreshData, gradeSubmission, subjects } = useDashboard();
   const { user, isLoading: authLoading } = useAuth();
@@ -53,7 +62,7 @@ export default function ReviewSubmissions() {
         if (error) throw error;
 
         const pending: PendingSubmission[] = (data || [])
-          .filter((s: any) => s.status === 'pending' && s.faculty?.trim().toLowerCase() === user.name?.trim().toLowerCase())
+          .filter((s: any) => s.status === 'pending' && normalizeName(s.faculty) === normalizeName(user.name))
           .map((s: any) => {
             const studentProfile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
             const subject = Array.isArray(s.subjects) ? s.subjects[0] : s.subjects;
@@ -76,7 +85,7 @@ export default function ReviewSubmissions() {
           });
 
         const graded: GradedSubmission[] = (data || [])
-          .filter((s: any) => s.status === 'graded' && s.faculty?.trim().toLowerCase() === user.name?.trim().toLowerCase())
+          .filter((s: any) => s.status === 'graded' && normalizeName(s.faculty) === normalizeName(user.name))
           .map((s: any) => {
             const studentProfile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
             const subject = Array.isArray(s.subjects) ? s.subjects[0] : s.subjects;
@@ -103,7 +112,7 @@ export default function ReviewSubmissions() {
         const studentProfiles = localUsers.filter((u: any) => u.role === 'student');
 
         const pending = localSubs
-          .filter((s: any) => s.status === 'pending' && s.faculty?.trim().toLowerCase() === user.name?.trim().toLowerCase())
+          .filter((s: any) => s.status === 'pending' && normalizeName(s.faculty) === normalizeName(user.name))
           .map((s: any) => {
             const student = studentProfiles.find((u) => u.id === s.studentId);
             const matchedSubject = subjects.find(sub => sub.id === s.subjectId);
@@ -125,7 +134,7 @@ export default function ReviewSubmissions() {
           });
 
         const graded = localSubs
-          .filter((s: any) => s.status === 'graded' && s.faculty?.trim().toLowerCase() === user.name?.trim().toLowerCase())
+          .filter((s: any) => s.status === 'graded' && normalizeName(s.faculty) === normalizeName(user.name))
           .map((s: any) => {
             const student = studentProfiles.find((u) => u.id === s.studentId);
             const matchedSubject = subjects.find(sub => sub.id === s.subjectId);
