@@ -68,13 +68,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         subscription.unsubscribe();
       };
     } else {
-      // LocalStorage Auth Fallback
-      const activeSession = localStorage.getItem('rf_session');
+      // SessionStorage Auth Fallback
+      const activeSession = sessionStorage.getItem('rf_session');
       if (activeSession) {
         try {
           setUser(JSON.parse(activeSession));
         } catch (e) {
-          localStorage.removeItem('rf_session');
+          sessionStorage.removeItem('rf_session');
         }
       }
       setIsLoading(false);
@@ -161,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         academicYear: '2025–26'
       };
 
-      localStorage.setItem('rf_session', JSON.stringify(profile));
+      sessionStorage.setItem('rf_session', JSON.stringify(profile));
       setUser(profile);
       return { success: true };
     }
@@ -237,7 +237,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
     } else {
-      localStorage.removeItem('rf_session');
+      sessionStorage.removeItem('rf_session');
       setUser(null);
     }
   };
