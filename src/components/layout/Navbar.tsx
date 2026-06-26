@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useScrollProgress } from '../../hooks/useScrollProgress';
 import { Menu, X, Layers } from 'lucide-react';
 import Button from '../ui/Button';
 
 export default function Navbar() {
+  const navigate = useNavigate();
   const { scrollY } = useScrollProgress();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -78,7 +80,12 @@ export default function Navbar() {
 
           {/* Desktop Action Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="ghost" size="sm" data-interactive="true">
+            <Button
+              variant="ghost"
+              size="sm"
+              data-interactive="true"
+              onClick={() => navigate('/login')}
+            >
               Log in
             </Button>
             <Button
@@ -87,10 +94,7 @@ export default function Navbar() {
               showArrow
               className="px-4.5 py-2 text-[13px]"
               data-interactive="true"
-              onClick={() => {
-                const ctaSec = document.getElementById('cta-section');
-                if (ctaSec) ctaSec.scrollIntoView({ behavior: 'smooth' });
-              }}
+              onClick={() => navigate('/signup')}
             >
               Get started
             </Button>
@@ -135,7 +139,10 @@ export default function Navbar() {
               variant="secondary"
               size="lg"
               className="w-full text-base"
-              onClick={() => setIsMobileMenuOpen(false)}
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                navigate('/login');
+              }}
               data-interactive="true"
             >
               Log in
@@ -148,8 +155,7 @@ export default function Navbar() {
               data-interactive="true"
               onClick={() => {
                 setIsMobileMenuOpen(false);
-                const ctaSec = document.getElementById('cta-section');
-                if (ctaSec) ctaSec.scrollIntoView({ behavior: 'smooth' });
+                navigate('/signup');
               }}
             >
               Get started free

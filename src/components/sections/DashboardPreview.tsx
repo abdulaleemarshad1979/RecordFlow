@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  LayoutDashboard, 
-  FileText, 
-  UploadCloud, 
-  Download, 
-  Users, 
-  CheckSquare, 
-  GraduationCap, 
-  Settings, 
-  Plus, 
+import {
+  LayoutDashboard,
+  FileText,
+  UploadCloud,
+  Download,
+  Users,
+  CheckSquare,
+  GraduationCap,
+  Settings,
+  Plus,
   Calendar,
   Sparkles,
   ArrowRight,
@@ -87,12 +87,12 @@ export default function DashboardPreview() {
       setStudentSubmissions([newSubmission, ...studentSubmissions]);
       setNewExpTitle('');
       setIsSubmitting(false);
-      
+
       // Also append to faculty queue to show dual-role sync
       const newPending: PendingEvaluation = {
         id: 'p-' + Date.now(),
         studentName: 'Abdul Aleem',
-        rollNo: '22A31A0501',
+        rollNo: '24P31A1234',
         expName: newExpTitle,
         subject: newExpSubject + ' Lab',
         daysWaiting: 1,
@@ -117,7 +117,7 @@ export default function DashboardPreview() {
 
     // Process evaluation
     setPendingEvaluations((prev) => prev.filter((item) => item.id !== id));
-    
+
     // Update faculty analytics
     setFacultyStats((prev) => {
       const newGraded = prev.gradedThisWeek + 1;
@@ -168,22 +168,20 @@ export default function DashboardPreview() {
           <div className="p-1.5 bg-bg-primary/80 border border-white/6 rounded-full flex items-center gap-1 shadow-lg max-w-[340px] w-full">
             <button
               onClick={() => setActiveTab('student')}
-              className={`flex-1 py-2 text-xs md:text-sm font-semibold rounded-full transition-all duration-200 cursor-pointer ${
-                activeTab === 'student'
+              className={`flex-1 py-2 text-xs md:text-sm font-semibold rounded-full transition-all duration-200 cursor-pointer ${activeTab === 'student'
                   ? 'bg-white text-bg-primary shadow-sm scale-100'
                   : 'text-text-secondary hover:text-white'
-              }`}
+                }`}
               data-interactive="true"
             >
               Student Portal
             </button>
             <button
               onClick={() => setActiveTab('faculty')}
-              className={`flex-1 py-2 text-xs md:text-sm font-semibold rounded-full transition-all duration-200 cursor-pointer ${
-                activeTab === 'faculty'
+              className={`flex-1 py-2 text-xs md:text-sm font-semibold rounded-full transition-all duration-200 cursor-pointer ${activeTab === 'faculty'
                   ? 'bg-white text-bg-primary shadow-sm scale-100'
                   : 'text-text-secondary hover:text-white'
-              }`}
+                }`}
               data-interactive="true"
             >
               Faculty Evaluation
@@ -200,7 +198,7 @@ export default function DashboardPreview() {
               <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
               <span className="w-3 h-3 rounded-full bg-green-500/80" />
             </div>
-            
+
             <div className="bg-bg-primary border border-white/4 px-6 py-1 rounded-full text-[11px] font-mono tracking-tight text-text-secondary w-2/3 md:w-1/3 flex items-center justify-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-pulse" />
               recordflow.in/{activeTab === 'student' ? 'student/dashboard' : 'faculty/evaluation'}
@@ -247,11 +245,10 @@ export default function DashboardPreview() {
                         return (
                           <button
                             key={i}
-                            className={`flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer w-full text-left whitespace-nowrap ${
-                              item.active 
-                                ? 'bg-accent-blue/10 border border-accent-blue/20 text-accent-blue' 
+                            className={`flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer w-full text-left whitespace-nowrap ${item.active
+                                ? 'bg-accent-blue/10 border border-accent-blue/20 text-accent-blue'
                                 : 'text-text-secondary hover:text-white hover:bg-white/2 border border-transparent'
-                            }`}
+                              }`}
                           >
                             <Icon className="w-3.5 h-3.5" />
                             {item.label}
@@ -271,11 +268,10 @@ export default function DashboardPreview() {
                         return (
                           <button
                             key={i}
-                            className={`flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer w-full text-left whitespace-nowrap ${
-                              item.active 
-                                ? 'bg-accent-cyan/10 border border-accent-cyan/20 text-accent-cyan' 
+                            className={`flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer w-full text-left whitespace-nowrap ${item.active
+                                ? 'bg-accent-cyan/10 border border-accent-cyan/20 text-accent-cyan'
                                 : 'text-text-secondary hover:text-white hover:bg-white/2 border border-transparent'
-                            }`}
+                              }`}
                           >
                             <Icon className="w-3.5 h-3.5" />
                             {item.label}
@@ -335,12 +331,12 @@ export default function DashboardPreview() {
                       {[
                         { label: 'Submissions', val: `${studentSubmissions.length} Submitted` },
                         { label: 'Evaluated', val: `${studentSubmissions.filter(s => s.status === 'Graded').length} Checked` },
-                        { 
-                          label: 'Cumulative GPA', 
+                        {
+                          label: 'Cumulative GPA',
                           val: (
-                            studentSubmissions.filter(s => s.grade !== null).reduce((acc, curr) => acc + (curr.grade || 0), 0) / 
+                            studentSubmissions.filter(s => s.grade !== null).reduce((acc, curr) => acc + (curr.grade || 0), 0) /
                             (studentSubmissions.filter(s => s.grade !== null).length || 1)
-                          ).toFixed(2) + ' / 10' 
+                          ).toFixed(2) + ' / 10'
                         },
                       ].map((card, i) => (
                         <div key={i} className="bg-bg-tertiary border border-white/5 p-3 md:p-4 rounded-xl">
@@ -415,10 +411,10 @@ export default function DashboardPreview() {
 
                             <div className="flex items-center justify-between sm:justify-end gap-4">
                               <span className="text-[10px] text-text-muted font-mono">{sub.date}</span>
-                              
+
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium
-                                ${sub.status === 'Graded' 
-                                  ? 'bg-green-500/10 border border-green-500/20 text-green-400' 
+                                ${sub.status === 'Graded'
+                                  ? 'bg-green-500/10 border border-green-500/20 text-green-400'
                                   : 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-400'
                                 }`}
                               >
