@@ -1,11 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BookOpen, CheckCircle, AlertTriangle, Loader2, Check } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import { useAuth } from '../../hooks/useAuth';
+import { useDashboard } from '../../hooks/useDashboard';
 
 export default function DownloadRecord() {
   const { user } = useAuth();
+  const { subjects, submissions } = useDashboard();
+
+  const subjectStats = useMemo(() => {
+    return subjects.map((sub) => {
+      const submitted = submissions.filter((s) => s.subjectId === sub.id && s.status === 'graded').length;
+      const total = sub.total;
+      const isComplete = submitted === total;
+      return {
+        id: sub.id,
+        name: sub.name,
+        submitted,
+        total,
+        isComplete
+      };
+    });
+  }, [subjects, submissions]);
+
+  const totalExperiments = useMemo(() => {
+    return subjectStats.reduce((sum, s) => sum + s.submitted, 0);
+  }, [subjectStats]);
 
   // Set document title
   useEffect(() => {
@@ -69,23 +90,23 @@ export default function DownloadRecord() {
                 Semester 4 Lab Record Book
               </h3>
               <p className="text-xs text-[#475569] font-satoshi mt-1 leading-normal">
-                14 evaluated experiments · 4 subjects · AY {user?.academicYear || '2025–26'}
+                {totalExperiments} evaluated experiments · {subjectStats.length} subjects · AY {user?.academicYear || '2025–26'}
               </p>
 
               {/* Subject Progress Chips */}
               <div className="flex flex-wrap items-center gap-2 mt-3.5 select-none">
-                <span className="text-[10.5px] font-semibold text-slate-500 font-satoshi uppercase bg-green-500/10 border border-green-500/20 text-[#22C55E] px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  DS Lab (5/6)
-                </span>
-                <span className="text-[10.5px] font-semibold text-slate-500 font-satoshi uppercase bg-green-500/10 border border-green-500/20 text-[#22C55E] px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  Web Tech (4/6)
-                </span>
-                <span className="text-[10.5px] font-semibold text-slate-500 font-satoshi uppercase bg-green-500/10 border border-green-500/20 text-[#22C55E] px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  OS Lab (6/6)
-                </span>
-                <span className="text-[10.5px] font-semibold text-slate-500 font-satoshi uppercase bg-amber-500/10 border border-amber-500/20 text-[#F59E0B] px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  DBMS Lab (3/6)
-                </span>
+                {subjectStats.map((stat) => (
+                  <span
+                    key={stat.id}
+                    className={`text-[10.5px] font-semibold font-satoshi uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1 border ${
+                      stat.isComplete
+                        ? 'bg-green-500/10 border-green-500/20 text-[#22C55E]'
+                        : 'bg-amber-500/10 border-amber-500/20 text-[#F59E0B]'
+                    }`}
+                  >
+                    {stat.name.split(' ')[0]} ({stat.submitted}/{stat.total})
+                  </span>
+                ))}
               </div>
             </div>
           </div>
@@ -111,17 +132,23 @@ export default function DownloadRecord() {
         </div>
 
         {/* Missing Records Warning Alert */}
-        <div className="bg-amber-500/[0.04] border border-amber-500/20 rounded-[10px] p-4 flex gap-3">
-          <AlertTriangle className="w-5 h-5 text-[#F59E0B] flex-shrink-0 mt-0.5" />
-          <div className="flex flex-col gap-0.5">
-            <h4 className="text-xs font-bold text-amber-500 font-satoshi uppercase tracking-wider select-none">
-              Attention Required
-            </h4>
-            <p className="text-xs text-[#94A3B8] font-satoshi leading-normal mt-0.5">
-              DBMS Lab is missing 3 experiments. These won't appear in your PDF. Ensure all missing works are evaluated prior to final submissions.
-            </p>
+        {subjectStats.some(s => !s.isComplete) && (
+          <div className="bg-amber-500/[0.04] border border-amber-500/20 rounded-[10px] p-4 flex gap-3 w-full">
+            <AlertTriangle className="w-5 h-5 text-[#F59E0B] flex-shrink-0 mt-0.5" />
+            <div className="flex flex-col gap-0.5">
+              <h4 className="text-xs font-bold text-amber-500 font-satoshi uppercase tracking-wider select-none">
+                Attention Required
+              </h4>
+              <p className="text-xs text-[#94A3B8] font-satoshi leading-normal mt-0.5">
+                {subjectStats
+                  .filter((s) => !s.isComplete)
+                  .map((s) => `${s.name} is missing ${s.total - s.submitted} experiments`)
+                  .join('. ')}
+                . These won't appear in your PDF. Ensure all missing works are evaluated prior to final submissions.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* What's Included details card */}
         <div

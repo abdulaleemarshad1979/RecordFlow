@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { UploadCloud, FileText, X, CheckCircle2, ChevronRight, Save } from 'lucide-react';
-import { subjects } from '../../data/mockData';
+import { subjects as mockSubjects } from '../../data/mockData';
 import Button from '../../components/ui/Button';
 import { useDashboard } from '../../hooks/useDashboard';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
@@ -11,7 +11,6 @@ import { useAuth } from '../../hooks/useAuth';
 export default function SubmitRecord() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { refreshData, submitRecord } = useDashboard();
   const { user } = useAuth();
 
   // Set document title
@@ -20,9 +19,13 @@ export default function SubmitRecord() {
   }, []);
 
   // Form states
-  const [subjectId, setSubjectId] = useState(subjects[0].id);
+  const { refreshData, submitRecord, subjects } = useDashboard();
+  const currentSubjects = subjects && subjects.length > 0 ? subjects : mockSubjects;
+
+  // Form states
+  const [subjectId, setSubjectId] = useState('');
   const [expNo, setExpNo] = useState(1);
-  const [faculty, setFaculty] = useState(subjects[0].faculty);
+  const [faculty, setFaculty] = useState('');
   const [submissionType, setSubmissionType] = useState('Lab Record');
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
@@ -34,13 +37,84 @@ export default function SubmitRecord() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // Auto-fill faculty based on subject selection
+  // Set default subject
   useEffect(() => {
-    const matchedSubject = subjects.find((s) => s.id === subjectId);
-    if (matchedSubject) {
-      setFaculty(matchedSubject.faculty);
+    if (currentSubjects.length > 0 && !subjectId) {
+      setSubjectId(currentSubjects[0].id);
     }
-  }, [subjectId]);
+  }, [currentSubjects, subjectId]);
+
+  // Fetch branch/section matching faculty members
+  const [availableFaculty, setAvailableFaculty] = useState<{name: string, email: string}[]>([]);
+  
+  useEffect(() => {
+    const fetchFaculty = async () => {
+      if (!user?.section) return;
+      try {
+        if (isSupabaseConfigured) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('name, email, section')
+            .eq('role', 'faculty');
+          
+          if (data && !error) {
+            const [studentBranch, studentSec] = user.section.split('-');
+            const filtered = data.filter((fac: any) => {
+              if (!fac.section) return false;
+              const facSecLower = fac.section.toLowerCase().trim();
+              const stdSecLower = user.section.toLowerCase().trim();
+              if (facSecLower === stdSecLower) return true;
+              
+              const [facBranch, facSec] = facSecLower.split('-');
+              return facBranch === studentBranch.toLowerCase().trim() && (!facSec || facSec === studentSec?.toLowerCase().trim());
+            });
+            setAvailableFaculty(filtered.map((f: any) => ({ name: f.name, email: f.email })));
+          }
+        } else {
+          const localUsers = JSON.parse(localStorage.getItem('rf_users') || '[]');
+          const registeredFaculty = localUsers.filter((u: any) => u.role === 'faculty');
+          const [studentBranch, studentSec] = user.section.split('-');
+          const filtered = registeredFaculty.filter((fac: any) => {
+            if (!fac.section) return false;
+            const facSecLower = fac.section.toLowerCase().trim();
+            const stdSecLower = user.section.toLowerCase().trim();
+            if (facSecLower === stdSecLower) return true;
+            
+            const [facBranch, facSec] = facSecLower.split('-');
+            return facBranch === studentBranch.toLowerCase().trim() && (!facSec || facSec === studentSec?.toLowerCase().trim());
+          });
+          setAvailableFaculty(filtered.map((f: any) => ({ name: f.name, email: f.email })));
+        }
+      } catch (err) {
+        console.error('Error fetching faculty:', err);
+      }
+    };
+    fetchFaculty();
+  }, [user, isSupabaseConfigured]);
+
+  const fallbackFaculty = [
+    { name: "Prof. Ravi Kumar" },
+    { name: "Dr. Priya Sharma" },
+    { name: "Dr. Anita Rao" }
+  ];
+
+  const facultyList = availableFaculty.length > 0 ? availableFaculty : fallbackFaculty;
+
+  // Sync selected faculty with available list or subject default
+  useEffect(() => {
+    if (facultyList.length > 0) {
+      const currentMatched = facultyList.find(f => f.name === faculty);
+      if (!currentMatched) {
+        // If subject has a default faculty in the subjects list, check if that matches
+        const matchedSubject = currentSubjects.find((s) => s.id === subjectId);
+        if (matchedSubject && facultyList.some(f => f.name === matchedSubject.faculty)) {
+          setFaculty(matchedSubject.faculty);
+        } else {
+          setFaculty(facultyList[0].name);
+        }
+      }
+    }
+  }, [facultyList, subjectId, currentSubjects, faculty]);
 
   // Handle Drag Events
   const handleDragEnter = (e: React.DragEvent) => {
@@ -126,7 +200,8 @@ export default function SubmitRecord() {
         title,
         notes,
         filePath,
-        formatFileSize(file.size)
+        formatFileSize(file.size),
+        faculty // Pass faculty!
       );
 
       if (!res.success) {
@@ -241,7 +316,7 @@ export default function SubmitRecord() {
                       className="w-full bg-[#090B14] text-[#F8FAFC] font-satoshi text-[14px] rounded-[10px] py-[13px] px-3.5 border border-white/8 outline-none focus:border-accent-blue/50 focus:ring-3 focus:ring-accent-blue/10 transition-all select-none cursor-pointer"
                       data-interactive="true"
                     >
-                      {subjects.map((s) => (
+                      {currentSubjects.map((s) => (
                         <option key={s.id} value={s.id} className="bg-[#050816]">
                           {s.name}
                         </option>
@@ -268,17 +343,23 @@ export default function SubmitRecord() {
                     </select>
                   </div>
 
-                  {/* Faculty Selector (Pre-filled, editable) */}
+                  {/* Faculty Selector (Dropdown dropdown list) */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[12px] font-medium text-slate-400 tracking-[0.5px] uppercase font-satoshi select-none">
                       Faculty Evaluator
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={faculty}
                       onChange={(e) => setFaculty(e.target.value)}
-                      className="w-full bg-[#090B14] text-[#F8FAFC] font-satoshi text-[14px] rounded-[10px] py-[13px] px-3.5 border border-white/8 outline-none focus:border-accent-blue/50 focus:ring-3 focus:ring-accent-blue/10 transition-all"
-                    />
+                      className="w-full bg-[#090B14] text-[#F8FAFC] font-satoshi text-[14px] rounded-[10px] py-[13px] px-3.5 border border-white/8 outline-none focus:border-accent-blue/50 focus:ring-3 focus:ring-accent-blue/10 transition-all select-none cursor-pointer"
+                      data-interactive="true"
+                    >
+                      {facultyList.map((fac) => (
+                        <option key={fac.name} value={fac.name} className="bg-[#050816]">
+                          {fac.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Submission Type */}

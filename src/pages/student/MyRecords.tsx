@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Eye, Download, X, FileSearch, Calendar, User, Tag, FileText } from 'lucide-react';
-import { subjects, Submission } from '../../data/mockData';
+import { Submission, subjects as mockSubjects } from '../../data/mockData';
 import { useDashboard } from '../../hooks/useDashboard';
 import StatusBadge from '../../components/dashboard/StatusBadge';
 import EmptyState from '../../components/dashboard/EmptyState';
@@ -10,12 +10,13 @@ import { useAuth } from '../../hooks/useAuth';
 
 export default function MyRecords() {
   const { user, isLoading: authLoading } = useAuth();
+  const { subjects } = useDashboard();
+  const currentSubjects = subjects && subjects.length > 0 ? subjects : mockSubjects;
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (authLoading) return;
 
     const fetchSubmissions = async () => {
       if (!user) {
@@ -164,7 +165,7 @@ export default function MyRecords() {
             data-interactive="true"
           >
             <option value="all">All Subjects</option>
-            {subjects.map((sub) => (
+            {currentSubjects.map((sub) => (
               <option key={sub.id} value={sub.id}>
                 {sub.name}
               </option>
@@ -219,7 +220,7 @@ export default function MyRecords() {
                         </div>
                       </td>
                       <td className="py-4 px-5 truncate max-w-[140px]">
-                        {subjects.find((s) => s.id === sub.subjectId)?.name || sub.subjectId}
+                        {currentSubjects.find((s) => s.id === sub.subjectId)?.name || sub.subjectId}
                       </td>
                       <td className="py-4 px-5 lg:table-cell hidden text-slate-400">
                         {sub.faculty}
@@ -289,7 +290,7 @@ export default function MyRecords() {
                 >
                   <div className="flex flex-col gap-1 min-w-0">
                     <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold font-satoshi select-none">
-                      Exp {sub.expNo} · {subjects.find((s) => s.id === sub.subjectId)?.name.split(' ')[0] || sub.subjectId}
+                      Exp {sub.expNo} · {currentSubjects.find((s) => s.id === sub.subjectId)?.name.split(' ')[0] || sub.subjectId}
                     </span>
                     <h3 className="text-sm font-semibold text-white font-satoshi truncate leading-normal">
                       {sub.title}
@@ -398,7 +399,7 @@ export default function MyRecords() {
                   {selectedSubmission.title}
                 </h3>
                 <span className="text-xs text-[#475569] font-satoshi mt-1.5">
-                  {subjects.find((s) => s.id === selectedSubmission.subjectId)?.name || selectedSubmission.subjectId}
+                  {currentSubjects.find((s) => s.id === selectedSubmission.subjectId)?.name || selectedSubmission.subjectId}
                 </span>
               </div>
 

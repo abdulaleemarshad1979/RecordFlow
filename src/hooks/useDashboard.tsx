@@ -5,7 +5,9 @@ import {
   Submission,
   StudentListItem,
   PendingSubmission,
-  GradedSubmission
+  GradedSubmission,
+  Subject,
+  subjects as mockSubjects
 } from '../data/mockData';
 
 interface DashboardContextType {
@@ -21,12 +23,13 @@ interface DashboardContextType {
   pendingSubmissions: PendingSubmission[];
   gradedSubmissions: GradedSubmission[];
   students: StudentListItem[];
+  subjects: Subject[];
   gradedTodayCount: number;
   isLoading: boolean;
   refreshData: () => Promise<void>;
   
   // Database Operations
-  submitRecord: (subjectId: string, expNo: number, title: string, notes: string, fileName: string, fileSize: string) => Promise<{ success: boolean; error?: string }>;
+  submitRecord: (subjectId: string, expNo: number, title: string, notes: string, fileName: string, fileSize: string, facultyName?: string) => Promise<{ success: boolean; error?: string }>;
   gradeSubmission: (id: string, grade: number, remarks: string) => Promise<{ success: boolean; error?: string }>;
 }
 
@@ -44,6 +47,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [pendingSubmissions, setPendingSubmissions] = useState<PendingSubmission[]>([]);
   const [gradedSubmissions, setGradedSubmissions] = useState<GradedSubmission[]>([]);
   const [students, setStudents] = useState<StudentListItem[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [gradedTodayCount, setGradedTodayCount] = useState(0);
 
   const toggleSidebar = () => setIsSidebarOpen(prev => !prev);
@@ -72,6 +76,22 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
 
     try {
+      // Fetch subjects first
+      let currentSubjects = mockSubjects;
+      if (isSupabaseConfigured) {
+        const { data: subjectsData, error: subjErr } = await supabase
+          .from('subjects')
+          .select('*');
+        if (subjectsData && !subjErr) {
+          setSubjects(subjectsData);
+          currentSubjects = subjectsData;
+        } else {
+          setSubjects(mockSubjects);
+        }
+      } else {
+        setSubjects(mockSubjects);
+      }
+
       if (user.role === 'student') {
         if (isSupabaseConfigured) {
           const { data, error } = await supabase
@@ -106,8 +126,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             // Compile students average lists
             const list: StudentListItem[] = studentsData.map((st) => {
               const studentSubs = subsData.filter((s) => s.student_id === st.id);
-              const webGrades = studentSubs.filter((s) => s.subject_id === 'web').map((s) => s.status === 'graded' ? Number(s.grade) : null);
-              const dbmsGrades = studentSubs.filter((s) => s.subject_id === 'dbms').map((s) => s.status === 'graded' ? Number(s.grade) : null);
+              const grades: { [subjectId: string]: (number | null)[] } = {};
+              currentSubjects.forEach((subj) => {
+                grades[subj.id] = studentSubs
+                  .filter((s) => s.subject_id === subj.id)
+                  .map((s) => s.status === 'graded' ? Number(s.grade) : null);
+              });
 
               return {
                 id: st.id,
@@ -115,10 +139,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
                 rollNo: st.roll_no || '—',
                 section: st.section,
                 submissions: studentSubs.map((s) => s.id),
-                grades: {
-                  web: webGrades,
-                  dbms: dbmsGrades
-                }
+                grades
               };
             });
             setStudents(list);
@@ -128,13 +149,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
               .filter((s) => s.status === 'pending')
               .map((s) => {
                 const matchedStudent = studentsData.find((st) => st.id === s.student_id);
+                const matchedSubject = currentSubjects.find((sub) => sub.id === s.subject_id);
                 return {
                   id: s.id,
                   studentId: s.student_id,
                   studentName: matchedStudent?.name || 'Unknown Student',
                   rollNo: matchedStudent?.roll_no || '—',
                   subjectId: s.subject_id,
-                  subjectName: s.subject_id === 'web' ? 'Web Technologies Lab' : 'DBMS Lab',
+                  subjectName: matchedSubject?.name || s.subject_id,
                   expNo: s.exp_no,
                   title: s.title,
                   submittedAt: s.submitted_at,
@@ -151,11 +173,13 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
               .filter((s) => s.status === 'graded')
               .map((s) => {
                 const matchedStudent = studentsData.find((st) => st.id === s.student_id);
+                const matchedSubject = currentSubjects.find((sub) => sub.id === s.subject_id);
                 return {
                   id: s.id,
                   studentName: matchedStudent?.name || 'Unknown Student',
                   rollNo: matchedStudent?.roll_no || '—',
-                  subjectName: s.subject_id === 'web' ? 'Web Technologies Lab' : 'DBMS Lab',
+                  subjectName: matchedSubject?.name || s.subject_id,
+                  subjectId: s.subject_id,
                   expNo: s.exp_no,
                   title: s.title,
                   grade: Number(s.grade),
@@ -173,16 +197,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
           const list: StudentListItem[] = studentProfiles.map((st: any) => {
             const studentSubs = localSubs.filter((s: any) => s.studentId === st.id);
+            const grades: { [subjectId: string]: (number | null)[] } = {};
+            currentSubjects.forEach((subj) => {
+              grades[subj.id] = studentSubs
+                .filter((s: any) => s.subjectId === subj.id)
+                .map((s: any) => s.status === 'graded' ? s.grade : null);
+            });
             return {
               id: st.id,
               name: st.name,
               rollNo: st.rollNo || '—',
               section: st.section,
               submissions: studentSubs.map((s: any) => s.id),
-              grades: {
-                web: studentSubs.filter((s: any) => s.subjectId === 'web').map((s: any) => s.status === 'graded' ? s.grade : null),
-                dbms: studentSubs.filter((s: any) => s.subjectId === 'dbms').map((s: any) => s.status === 'graded' ? s.grade : null)
-              }
+              grades
             };
           });
           setStudents(list);
@@ -191,13 +218,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             .filter((s: any) => s.status === 'pending')
             .map((s: any) => {
               const student = studentProfiles.find((u) => u.id === s.studentId);
+              const matchedSubject = currentSubjects.find((sub) => sub.id === s.subjectId);
               return {
                 id: s.id,
                 studentId: s.studentId,
                 studentName: student?.name || 'Unknown Student',
                 rollNo: student?.rollNo || '—',
                 subjectId: s.subjectId,
-                subjectName: s.subjectId === 'web' ? 'Web Technologies Lab' : 'DBMS Lab',
+                subjectName: matchedSubject?.name || s.subjectId,
                 expNo: s.expNo,
                 title: s.title,
                 submittedAt: s.submittedAt,
@@ -213,11 +241,13 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             .filter((s: any) => s.status === 'graded')
             .map((s: any) => {
               const student = studentProfiles.find((u) => u.id === s.studentId);
+              const matchedSubject = currentSubjects.find((sub) => sub.id === s.subjectId);
               return {
                 id: s.id,
                 studentName: student?.name || 'Unknown Student',
                 rollNo: student?.rollNo || '—',
-                subjectName: s.subjectId === 'web' ? 'Web Technologies Lab' : 'DBMS Lab',
+                subjectName: matchedSubject?.name || s.subjectId,
+                subjectId: s.subjectId,
                 expNo: s.expNo,
                 title: s.title,
                 grade: s.grade,
@@ -275,7 +305,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     title: string,
     notes: string,
     fileName: string,
-    fileSize: string
+    fileSize: string,
+    facultyName?: string
   ) => {
     if (!user) return { success: false, error: "Authentication required." };
     
@@ -287,7 +318,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       dbms: "Dr. Anita Rao"
     };
 
-    const assignedFaculty = facultyMap[subjectId] || "Academic Board";
+    const assignedFaculty = facultyName || facultyMap[subjectId] || "Academic Board";
     const today = new Date().toISOString().split('T')[0];
 
     if (isSupabaseConfigured) {
@@ -392,6 +423,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         pendingSubmissions,
         gradedSubmissions,
         students,
+        subjects,
         gradedTodayCount,
         isLoading,
         refreshData,

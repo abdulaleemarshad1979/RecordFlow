@@ -44,6 +44,7 @@ export default function Signup() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [college, setCollege] = useState(COLLEGES[0]);
+  const [branch, setBranch] = useState('');
   const [section, setSection] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
 
@@ -84,7 +85,7 @@ export default function Signup() {
   };
 
   const validateForm = () => {
-    if (!name || !email || !password || !section) {
+    if (!name || !email || !password || !branch || !section) {
       setError("Please fill out all required fields.");
       return false;
     }
@@ -130,7 +131,7 @@ export default function Signup() {
       rollNo: role === 'student' ? rollNo : undefined,
       employeeId: role === 'faculty' ? employeeId : undefined,
       college,
-      section
+      section: `${branch.toUpperCase().trim()}-${section.toUpperCase().trim()}`
     };
 
     const res = await signup(email, password, role, details);
@@ -492,7 +493,7 @@ export default function Signup() {
                         hidden: { opacity: 0, y: 15 },
                         visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } }
                       }}
-                      className="grid grid-cols-2 gap-4 mt-1"
+                      className="flex flex-col gap-4 mt-1"
                     >
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[12px] font-medium text-slate-400 tracking-[0.5px] uppercase font-satoshi select-none">
@@ -512,17 +513,32 @@ export default function Signup() {
                         </select>
                       </div>
 
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[12px] font-medium text-slate-400 tracking-[0.5px] uppercase font-satoshi select-none">
-                          Section
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="CSE-B"
-                          value={section}
-                          onChange={(e) => setSection(e.target.value)}
-                          className="w-full bg-[#0B1120]/80 text-[#F8FAFC] font-satoshi text-[14px] rounded-[10px] py-[13px] px-3.5 border border-white/8 outline-none focus:border-accent-blue/50 focus:ring-3 focus:ring-accent-blue/10 transition-all"
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[12px] font-medium text-slate-400 tracking-[0.5px] uppercase font-satoshi select-none">
+                            Branch
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="IT"
+                            value={branch}
+                            onChange={(e) => setBranch(e.target.value)}
+                            className="w-full bg-[#0B1120]/80 text-[#F8FAFC] font-satoshi text-[14px] rounded-[10px] py-[13px] px-3.5 border border-white/8 outline-none focus:border-accent-blue/50 focus:ring-3 focus:ring-accent-blue/10 transition-all"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[12px] font-medium text-slate-400 tracking-[0.5px] uppercase font-satoshi select-none">
+                            Section
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="A"
+                            value={section}
+                            onChange={(e) => setSection(e.target.value)}
+                            className="w-full bg-[#0B1120]/80 text-[#F8FAFC] font-satoshi text-[14px] rounded-[10px] py-[13px] px-3.5 border border-white/8 outline-none focus:border-accent-blue/50 focus:ring-3 focus:ring-accent-blue/10 transition-all"
+                          />
+                        </div>
                       </div>
                     </motion.div>
 

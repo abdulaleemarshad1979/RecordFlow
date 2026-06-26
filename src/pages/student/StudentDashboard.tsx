@@ -11,7 +11,7 @@ import {
   Download,
   AlertTriangle
 } from 'lucide-react';
-import { subjects } from '../../data/mockData';
+import { subjects as mockSubjects } from '../../data/mockData';
 import { useAuth } from '../../hooks/useAuth';
 import { useDashboard } from '../../hooks/useDashboard';
 import MetricCard from '../../components/dashboard/MetricCard';
@@ -21,7 +21,8 @@ import Button from '../../components/ui/Button';
 export default function StudentDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { submissions } = useDashboard();
+  const { submissions, subjects } = useDashboard();
+  const currentSubjects = subjects && subjects.length > 0 ? subjects : mockSubjects;
 
   // Set document title
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function StudentDashboard() {
 
   // Compute progress for each subject
   const subjectProgress = useMemo(() => {
-    return subjects.map((subject) => {
+    return currentSubjects.map((subject) => {
       const submitted = submissions.filter((s) => s.subjectId === subject.id).length;
       const percentage = Math.round((submitted / subject.total) * 100);
       
@@ -204,7 +205,7 @@ export default function StudentDashboard() {
                     {sub.title}
                   </h4>
                   <span className="text-xs text-[#475569] font-satoshi truncate">
-                    {subjects.find((s) => s.id === sub.subjectId)?.name.split(' ')[0] || sub.subjectId} · {sub.faculty.split(' ')[1] || sub.faculty} · {sub.submittedAt}
+                    {currentSubjects.find((s) => s.id === sub.subjectId)?.name.split(' ')[0] || sub.subjectId} · {sub.faculty.split(' ')[1] || sub.faculty} · {sub.submittedAt}
                   </span>
                 </div>
 

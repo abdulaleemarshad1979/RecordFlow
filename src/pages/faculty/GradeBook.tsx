@@ -2,18 +2,25 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DownloadCloud, Check, AlertTriangle, TrendingUp, Star, Users } from 'lucide-react';
 import { useDashboard } from '../../hooks/useDashboard';
-import { subjects, StudentListItem } from '../../data/mockData';
+import { StudentListItem } from '../../data/mockData';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function GradeBook() {
-  const { students, pendingSubmissions, gradedSubmissions } = useDashboard();
+  const { students, pendingSubmissions, gradedSubmissions, subjects } = useDashboard();
+  const { user } = useAuth();
 
-  // Set document title
-  useEffect(() => {
-    document.title = "RecordFlow — Grade Book";
-  }, []);
+  const facultySubjects = useMemo(() => {
+    return subjects.filter(s => s.faculty === user?.name || s.id === 'web' || s.id === 'dbms');
+  }, [subjects, user]);
 
-  const [activeTab, setActiveTab] = useState<'web' | 'dbms'>('web');
+  const [activeTab, setActiveTab] = useState<string>('');
   const [showToast, setShowToast] = useState(false);
+
+  useEffect(() => {
+    if (facultySubjects.length > 0 && !activeTab) {
+      setActiveTab(facultySubjects[0].id);
+    }
+  }, [facultySubjects, activeTab]);
 
   // Helper to lookup cell data dynamically for a student and subject
   const getCellData = (studentId: string, subjectId: string, expNo: number) => {
@@ -30,43 +37,11 @@ export default function GradeBook() {
 
     // 2. Check local graded submissions in context
     const graded = gradedSubmissions.find(
-      (g) => {
-        const isSubjectMatch =
-          (subjectId === 'web' && g.subjectName.toLowerCase().includes('web')) ||
-          (subjectId === 'dbms' && g.subjectName.toLowerCase().includes('db'));
-        return g.rollNo === student.rollNo && isSubjectMatch && g.expNo === expNo;
-      }
+      (g) => g.rollNo === student.rollNo && g.subjectId === subjectId && g.expNo === expNo
     );
     if (graded) {
       return { status: 'graded', grade: graded.grade };
     }
-
-    // 3. Fallback to student profile seed grades (mockData initial values)
-    // s1: web [9, null] (exp 3 is graded 9, wait, exp 3 is index 0 of web, and exp 4 is index 1 which is null/pending)
-    // let's do a mock matching index mapping if needed:
-    if (student.id === 's1' && subjectId === 'web' && expNo === 3) return { status: 'graded', grade: 9 };
-    if (student.id === 's1' && subjectId === 'web' && expNo === 4) return { status: 'pending', grade: null };
-    if (student.id === 's1' && subjectId === 'dbms' && expNo === 3) return { status: 'graded', grade: 7 };
-
-    if (student.id === 's2' && subjectId === 'web' && expNo === 3) return { status: 'graded', grade: 8 };
-    if (student.id === 's2' && subjectId === 'web' && expNo === 2) return { status: 'graded', grade: 7 };
-    if (student.id === 's2' && subjectId === 'dbms' && expNo === 3) return { status: 'graded', grade: 6 };
-
-    if (student.id === 's3' && subjectId === 'web' && expNo === 2) return { status: 'graded', grade: 6 };
-
-    if (student.id === 's4' && subjectId === 'web' && expNo === 4) return { status: 'graded', grade: 10 };
-    if (student.id === 's4' && subjectId === 'web' && expNo === 5) return { status: 'graded', grade: 9 };
-    if (student.id === 's4' && subjectId === 'dbms' && expNo === 4) return { status: 'graded', grade: 8 };
-    if (student.id === 's4' && subjectId === 'dbms' && expNo === 5) return { status: 'graded', grade: 9 };
-
-    if (student.id === 's5' && subjectId === 'web' && expNo === 9) return { status: 'graded', grade: 7 }; // wait, expNo 1-6 only, let's keep it clean
-    if (student.id === 's5' && subjectId === 'web' && expNo === 3) return { status: 'graded', grade: 7 };
-    if (student.id === 's5' && subjectId === 'dbms' && expNo === 2) return { status: 'graded', grade: 5 };
-
-    if (student.id === 's6' && subjectId === 'web' && expNo === 5) return { status: 'graded', grade: 9 };
-    if (student.id === 's6' && subjectId === 'web' && expNo === 6) return { status: 'graded', grade: 8 };
-    if (student.id === 's6' && subjectId === 'dbms' && expNo === 5) return { status: 'graded', grade: 7 };
-    if (student.id === 's6' && subjectId === 'dbms' && expNo === 6) return { status: 'graded', grade: 8 };
 
     return { status: 'none', grade: null };
   };
@@ -150,11 +125,12 @@ export default function GradeBook() {
       csv += line;
     });
 
+    const subName = facultySubjects.find(s => s.id === activeTab)?.name.replace(/\s+/g, '') || activeTab;
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `grades_${activeTab === 'web' ? 'WebTech' : 'DBMS'}_IT-B.csv`);
+    link.setAttribute("download", `grades_${subName}_${user?.section || 'section'}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -192,23 +168,22 @@ export default function GradeBook() {
       {/* Tab Switcher */}
       <div className="w-full max-w-sm">
         <div className="bg-[#0B1120]/80 border border-white/[0.06] rounded-[10px] p-1 flex relative overflow-hidden">
-          {(['web', 'dbms'] as const).map((tab) => (
+          {facultySubjects.map((sub) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
+              key={sub.id}
+              onClick={() => setActiveTab(sub.id)}
               className={`flex-1 py-1.5 text-center text-xs font-semibold font-satoshi rounded-[8px] transition-colors relative z-10 select-none cursor-pointer ${
-                activeTab === tab ? 'text-white' : 'text-[#64748B]'
+                activeTab === sub.id ? 'text-white' : 'text-[#64748B]'
               }`}
-              data-interactive="true"
             >
-              {tab === 'web' ? 'Web Technologies Lab' : 'DBMS Lab'}
-              {activeTab === tab && (
+              {activeTab === sub.id && (
                 <motion.div
-                  layoutId="gradeTabIndicator"
+                  layoutId="active-tab"
                   className="absolute inset-0 bg-[#3B82F6]/15 border border-[#3B82F6]/30 rounded-[8px] -z-10"
                   transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                 />
               )}
+              <span>{sub.name.split(' ')[0]}</span>
             </button>
           ))}
         </div>
@@ -355,7 +330,7 @@ export default function GradeBook() {
             <div className="flex flex-col gap-0.5">
               <span className="text-sm font-semibold text-white font-satoshi">Export Complete</span>
               <span className="text-xs text-[#94A3B8] font-satoshi leading-normal truncate max-w-[240px]">
-                grades_{activeTab === 'web' ? 'WebTech' : 'DBMS'}_IT-B.csv downloaded
+                grades_{(facultySubjects.find(s => s.id === activeTab)?.name.replace(/\s+/g, '') || activeTab)}_{user?.section || 'section'}.csv downloaded
               </span>
             </div>
           </motion.div>

@@ -11,7 +11,11 @@ import Button from '../../components/ui/Button';
 export default function FacultyDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { pendingSubmissions, gradedSubmissions, students } = useDashboard();
+  const { pendingSubmissions, gradedSubmissions, students, subjects } = useDashboard();
+
+  const facultySubjects = useMemo(() => {
+    return subjects.filter(s => s.faculty === user?.name || s.id === 'web' || s.id === 'dbms');
+  }, [subjects, user]);
 
   // Set document title
   useEffect(() => {
@@ -102,7 +106,7 @@ export default function FacultyDashboard() {
             Good morning, {user?.name ? user.name.split(' ')[0] : 'Faculty'} 👋
           </h2>
           <p className="text-[13px] text-[#475569] font-satoshi">
-            Web Technologies Lab · DBMS Lab · IT-B · AY 2025–26
+            {facultySubjects.map(s => s.name).join(' · ') || 'No Assigned Labs'} · {user?.section || '—'} · AY 2025–26
           </p>
         </div>
         
@@ -147,7 +151,7 @@ export default function FacultyDashboard() {
         <MetricCard
           label="Students Total"
           value={metrics.studentCount}
-          subtext="Enrolled in IT-B section"
+          subtext={`Enrolled in ${user?.section || '—'} section`}
           icon={Users}
           color="blue"
           index={3}

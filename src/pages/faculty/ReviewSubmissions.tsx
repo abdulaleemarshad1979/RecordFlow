@@ -8,7 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { PendingSubmission, GradedSubmission } from '../../data/mockData';
 
 export default function ReviewSubmissions() {
-  const { refreshData, gradeSubmission } = useDashboard();
+  const { refreshData, gradeSubmission, subjects } = useDashboard();
   const { user, isLoading: authLoading } = useAuth();
   const [pendingSubmissions, setPendingSubmissions] = useState<PendingSubmission[]>([]);
   const [gradedSubmissions, setGradedSubmissions] = useState<GradedSubmission[]>([]);
@@ -53,17 +53,18 @@ export default function ReviewSubmissions() {
         if (error) throw error;
 
         const pending: PendingSubmission[] = (data || [])
-          .filter((s: any) => s.status === 'pending')
+          .filter((s: any) => s.status === 'pending' && s.faculty?.trim().toLowerCase() === user.name?.trim().toLowerCase())
           .map((s: any) => {
             const studentProfile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
             const subject = Array.isArray(s.subjects) ? s.subjects[0] : s.subjects;
+            const matchedSubject = subjects.find(sub => sub.id === s.subject_id);
             return {
               id: s.id,
               studentId: s.student_id,
               studentName: studentProfile?.name || 'Unknown Student',
               rollNo: studentProfile?.roll_no || '—',
               subjectId: s.subject_id,
-              subjectName: subject?.name || (s.subject_id === 'web' ? 'Web Technologies Lab' : 'DBMS Lab'),
+              subjectName: subject?.name || matchedSubject?.name || s.subject_id,
               expNo: s.exp_no,
               title: s.title,
               submittedAt: s.submitted_at,
@@ -75,15 +76,16 @@ export default function ReviewSubmissions() {
           });
 
         const graded: GradedSubmission[] = (data || [])
-          .filter((s: any) => s.status === 'graded')
+          .filter((s: any) => s.status === 'graded' && s.faculty?.trim().toLowerCase() === user.name?.trim().toLowerCase())
           .map((s: any) => {
             const studentProfile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
             const subject = Array.isArray(s.subjects) ? s.subjects[0] : s.subjects;
+            const matchedSubject = subjects.find(sub => sub.id === s.subject_id);
             return {
               id: s.id,
               studentName: studentProfile?.name || 'Unknown Student',
               rollNo: studentProfile?.roll_no || '—',
-              subjectName: subject?.name || (s.subject_id === 'web' ? 'Web Technologies Lab' : 'DBMS Lab'),
+              subjectName: subject?.name || matchedSubject?.name || s.subject_id,
               expNo: s.exp_no,
               title: s.title,
               grade: Number(s.grade),
@@ -101,16 +103,17 @@ export default function ReviewSubmissions() {
         const studentProfiles = localUsers.filter((u: any) => u.role === 'student');
 
         const pending = localSubs
-          .filter((s: any) => s.status === 'pending')
+          .filter((s: any) => s.status === 'pending' && s.faculty?.trim().toLowerCase() === user.name?.trim().toLowerCase())
           .map((s: any) => {
             const student = studentProfiles.find((u) => u.id === s.studentId);
+            const matchedSubject = subjects.find(sub => sub.id === s.subjectId);
             return {
               id: s.id,
               studentId: s.studentId,
               studentName: student?.name || 'Unknown Student',
               rollNo: student?.rollNo || '—',
               subjectId: s.subjectId,
-              subjectName: s.subjectId === 'web' ? 'Web Technologies Lab' : 'DBMS Lab',
+              subjectName: matchedSubject?.name || s.subjectId,
               expNo: s.expNo,
               title: s.title,
               submittedAt: s.submittedAt,
@@ -122,14 +125,15 @@ export default function ReviewSubmissions() {
           });
 
         const graded = localSubs
-          .filter((s: any) => s.status === 'graded')
+          .filter((s: any) => s.status === 'graded' && s.faculty?.trim().toLowerCase() === user.name?.trim().toLowerCase())
           .map((s: any) => {
             const student = studentProfiles.find((u) => u.id === s.studentId);
+            const matchedSubject = subjects.find(sub => sub.id === s.subjectId);
             return {
               id: s.id,
               studentName: student?.name || 'Unknown Student',
               rollNo: student?.rollNo || '—',
-              subjectName: s.subjectId === 'web' ? 'Web Technologies Lab' : 'DBMS Lab',
+              subjectName: matchedSubject?.name || s.subjectId,
               expNo: s.expNo,
               title: s.title,
               grade: Number(s.grade),
@@ -226,8 +230,9 @@ export default function ReviewSubmissions() {
             data-interactive="true"
           >
             <option value="all">All Subjects</option>
-            <option value="web">Web Technologies Lab</option>
-            <option value="dbms">DBMS Lab</option>
+            {subjects.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
           </select>
 
           {/* Sort Order */}

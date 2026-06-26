@@ -2,10 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, X, Eye, BookOpen, GraduationCap, School } from 'lucide-react';
 import { useDashboard } from '../../hooks/useDashboard';
-import { subjects, StudentListItem } from '../../data/mockData';
+import { StudentListItem } from '../../data/mockData';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function StudentsList() {
-  const { students } = useDashboard();
+  const { students, subjects } = useDashboard();
+  const { user } = useAuth();
 
   // Set document title
   useEffect(() => {
@@ -107,8 +109,8 @@ export default function StudentsList() {
   const subjectBreakdown = useMemo(() => {
     if (!activeStudent) return [];
 
-    // Faculty only teaches 'web' and 'dbms'
-    const facultySubjects = subjects.filter((s) => s.id === 'web' || s.id === 'dbms');
+    // Faculty only teaches subjects assigned to them (or fallback to 'web' and 'dbms')
+    const facultySubjects = subjects.filter((s) => s.faculty === user?.name || s.id === 'web' || s.id === 'dbms');
 
     return facultySubjects.map((sub) => {
       const grades = activeStudent.grades[sub.id] || [];
@@ -174,7 +176,7 @@ export default function StudentsList() {
           Students
         </h2>
         <p className="text-[13px] text-[#475569] font-satoshi">
-          IT-B · {stats.total} students enrolled
+          {user?.section || '—'} · {stats.total} students enrolled
         </p>
       </div>
 
@@ -202,8 +204,9 @@ export default function StudentsList() {
             data-interactive="true"
           >
             <option value="all">All sections</option>
-            <option value="IT-A">IT-A</option>
-            <option value="IT-B">IT-B</option>
+            {Array.from(new Set(students.map((s) => s.section).filter(Boolean))).map((sec) => (
+              <option key={sec} value={sec}>{sec}</option>
+            ))}
           </select>
 
           {/* Sort order filter */}
