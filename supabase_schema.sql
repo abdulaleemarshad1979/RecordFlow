@@ -1,6 +1,3 @@
--- SQL Schema for RecordFlow
-
--- 1. Create Profiles Table (Stores Student and Faculty records linked to Supabase Auth)
 CREATE TABLE public.profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   name TEXT NOT NULL,
@@ -14,10 +11,8 @@ CREATE TABLE public.profiles (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable Row Level Security (RLS) on profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- Create Policies for Profiles
 CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles
   FOR SELECT USING (true);
 
@@ -28,7 +23,6 @@ CREATE POLICY "Users can update their own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
 
--- 2. Create Subjects Table
 CREATE TABLE public.subjects (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -36,14 +30,11 @@ CREATE TABLE public.subjects (
   total INTEGER NOT NULL DEFAULT 6
 );
 
--- Enable RLS on subjects
 ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
 
--- Policies for Subjects
 CREATE POLICY "Subjects are viewable by authenticated users" ON public.subjects
   FOR SELECT USING (auth.role() = 'authenticated');
 
--- Insert initial subjects seed data
 INSERT INTO public.subjects (id, name, faculty, total) VALUES
   ('ds', 'Data Structures Lab', 'Prof. Ravi Kumar', 6),
   ('web', 'Web Technologies Lab', 'Dr. Priya Sharma', 6),
@@ -52,7 +43,6 @@ INSERT INTO public.subjects (id, name, faculty, total) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 
--- 3. Create Submissions Table
 CREATE TABLE public.submissions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   student_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -70,10 +60,8 @@ CREATE TABLE public.submissions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable RLS on submissions
 ALTER TABLE public.submissions ENABLE ROW LEVEL SECURITY;
 
--- Policies for Submissions
 CREATE POLICY "Students can view their own submissions" ON public.submissions
   FOR SELECT USING (auth.uid() = student_id);
 
