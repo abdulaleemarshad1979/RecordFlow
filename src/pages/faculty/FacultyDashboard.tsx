@@ -3,12 +3,14 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Clock, CheckCircle, BarChart2, Users, FileText, ArrowRight } from 'lucide-react';
 import { useDashboard } from '../../hooks/useDashboard';
 import { facultyProfile } from '../../data/mockData';
+import { useAuth } from '../../hooks/useAuth';
 import MetricCard from '../../components/dashboard/MetricCard';
 import StatusBadge from '../../components/dashboard/StatusBadge';
 import Button from '../../components/ui/Button';
 
 export default function FacultyDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { pendingSubmissions, gradedSubmissions, students } = useDashboard();
 
   // Set document title
@@ -97,7 +99,7 @@ export default function FacultyDashboard() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl font-bold font-satoshi text-white">
-            Good morning, Dr. Priya 👋
+            Good morning, {user?.name ? user.name.split(' ')[0] : 'Faculty'} 👋
           </h2>
           <p className="text-[13px] text-[#475569] font-satoshi">
             Web Technologies Lab · DBMS Lab · IT-B · AY 2025–26

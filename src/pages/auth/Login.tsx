@@ -10,9 +10,20 @@ import { useAuth } from '../../hooks/useAuth';
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, user, isLoading: authLoading } = useAuth();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (user.role === 'student') {
+        navigate('/student/dashboard', { replace: true });
+      } else {
+        navigate('/faculty/dashboard', { replace: true });
+      }
+    }
+  }, [user, authLoading, navigate]);
+
   // Set document title and check for redirect toast
   useEffect(() => {
     document.title = "RecordFlow — Sign in";

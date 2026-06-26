@@ -18,7 +18,18 @@ const COLLEGES = [
 
 export default function Signup() {
   const navigate = useNavigate();
-  const { signup } = useAuth();
+  const { signup, user, isLoading: authLoading } = useAuth();
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (user.role === 'student') {
+        navigate('/student/dashboard', { replace: true });
+      } else {
+        navigate('/faculty/dashboard', { replace: true });
+      }
+    }
+  }, [user, authLoading, navigate]);
 
   // Set document title
   useEffect(() => {

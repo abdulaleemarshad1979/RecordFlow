@@ -13,7 +13,7 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
     const timer = setTimeout(() => {
       document.body.style.overflow = 'unset';
       onComplete();
-    }, 2000);
+    }, 500);
 
     return () => {
       document.body.style.overflow = 'unset';
@@ -52,7 +52,7 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
             style={{ width: '100%' }}
             initial={{ left: '-100%' }}
             animate={{ left: '100%' }}
-            transition={{ duration: 0.7, delay: 0.4, ease: [0.4, 0, 0.2, 1] }}
+            transition={{ duration: 0.4, delay: 0.1, ease: [0.4, 0, 0.2, 1] }}
           />
         </div>
 
@@ -62,7 +62,7 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
           className="text-text-secondary text-sm md:text-base font-medium font-satoshi"
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 1.0, ease: 'easeOut' }}
+          transition={{ duration: 0.3, delay: 0.2, ease: 'easeOut' }}
         >
           Digital lab records for engineering colleges
         </motion.p>

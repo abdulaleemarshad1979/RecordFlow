@@ -1,12 +1,25 @@
 import React from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { DashboardProvider } from '../../hooks/useDashboard';
+import { useAuth } from '../../hooks/useAuth';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 
 export default function FacultyLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isLoading } = useAuth();
+
+  React.useEffect(() => {
+    if (!isLoading) {
+      if (!user) {
+        navigate('/login', { replace: true });
+      } else if (user.role !== 'faculty') {
+        navigate('/student/dashboard', { replace: true });
+      }
+    }
+  }, [user, isLoading, navigate]);
 
   // Determine topbar titles based on path
   const getHeaderDetails = (path: string) => {
@@ -28,6 +41,14 @@ export default function FacultyLayout() {
   };
 
   const header = getHeaderDetails(location.pathname);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#050816]">
+        <div className="w-8 h-8 border-4 border-accent-blue border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <DashboardProvider>

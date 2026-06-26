@@ -3,92 +3,144 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Search, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { useDashboard } from '../../hooks/useDashboard';
 import ReviewCard from '../../components/dashboard/ReviewCard';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
 import { PendingSubmission, GradedSubmission } from '../../data/mockData';
 
 export default function ReviewSubmissions() {
-  const { refreshData } = useDashboard();
+  const { refreshData, gradeSubmission } = useDashboard();
+  const { user, isLoading: authLoading } = useAuth();
   const [pendingSubmissions, setPendingSubmissions] = useState<PendingSubmission[]>([]);
   const [gradedSubmissions, setGradedSubmissions] = useState<GradedSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchSubmissions = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    setError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (isSupabaseConfigured) {
+        // Verify this user is actually faculty
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, name')
+          .eq('id', user.id)
+          .single();
 
-      // Verify this user is actually faculty
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role, name')
-        .eq('id', user.id)
-        .single();
+        if (profileError || profile?.role !== 'faculty') {
+          setError('Access denied');
+          return;
+        }
 
-      if (profileError || profile?.role !== 'faculty') {
-        setError('Access denied');
-        return;
+        // Fetch submissions
+        const { data, error } = await supabase
+          .from('submissions')
+          .select(`
+            *,
+            subjects ( name ),
+            profiles!student_id (
+              name,
+              roll_no,
+              section
+            )
+          `)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        const pending: PendingSubmission[] = (data || [])
+          .filter((s: any) => s.status === 'pending')
+          .map((s: any) => {
+            const studentProfile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
+            const subject = Array.isArray(s.subjects) ? s.subjects[0] : s.subjects;
+            return {
+              id: s.id,
+              studentId: s.student_id,
+              studentName: studentProfile?.name || 'Unknown Student',
+              rollNo: studentProfile?.roll_no || '—',
+              subjectId: s.subject_id,
+              subjectName: subject?.name || (s.subject_id === 'web' ? 'Web Technologies Lab' : 'DBMS Lab'),
+              expNo: s.exp_no,
+              title: s.title,
+              submittedAt: s.submitted_at,
+              daysAgo: Math.max(1, Math.round((Date.now() - new Date(s.submitted_at).getTime()) / (1000 * 60 * 60 * 24))),
+              fileName: s.file_name,
+              fileSize: s.file_size,
+              notes: s.notes
+            };
+          });
+
+        const graded: GradedSubmission[] = (data || [])
+          .filter((s: any) => s.status === 'graded')
+          .map((s: any) => {
+            const studentProfile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
+            const subject = Array.isArray(s.subjects) ? s.subjects[0] : s.subjects;
+            return {
+              id: s.id,
+              studentName: studentProfile?.name || 'Unknown Student',
+              rollNo: studentProfile?.roll_no || '—',
+              subjectName: subject?.name || (s.subject_id === 'web' ? 'Web Technologies Lab' : 'DBMS Lab'),
+              expNo: s.exp_no,
+              title: s.title,
+              grade: Number(s.grade),
+              remarks: s.remarks || '',
+              gradedAt: s.submitted_at
+            };
+          });
+
+        setPendingSubmissions(pending);
+        setGradedSubmissions(graded);
+      } else {
+        // LocalStorage fallback
+        const localUsers = JSON.parse(localStorage.getItem('rf_users') || '[]');
+        const localSubs = JSON.parse(localStorage.getItem('rf_submissions') || '[]');
+        const studentProfiles = localUsers.filter((u: any) => u.role === 'student');
+
+        const pending = localSubs
+          .filter((s: any) => s.status === 'pending')
+          .map((s: any) => {
+            const student = studentProfiles.find((u) => u.id === s.studentId);
+            return {
+              id: s.id,
+              studentId: s.studentId,
+              studentName: student?.name || 'Unknown Student',
+              rollNo: student?.rollNo || '—',
+              subjectId: s.subjectId,
+              subjectName: s.subjectId === 'web' ? 'Web Technologies Lab' : 'DBMS Lab',
+              expNo: s.expNo,
+              title: s.title,
+              submittedAt: s.submittedAt,
+              daysAgo: Math.max(1, Math.round((Date.now() - new Date(s.submittedAt).getTime()) / (1000 * 60 * 60 * 24))),
+              fileName: s.fileName || 'document.pdf',
+              fileSize: s.fileSize || '1.0 MB',
+              notes: s.notes
+            };
+          });
+
+        const graded = localSubs
+          .filter((s: any) => s.status === 'graded')
+          .map((s: any) => {
+            const student = studentProfiles.find((u) => u.id === s.studentId);
+            return {
+              id: s.id,
+              studentName: student?.name || 'Unknown Student',
+              rollNo: student?.rollNo || '—',
+              subjectName: s.subjectId === 'web' ? 'Web Technologies Lab' : 'DBMS Lab',
+              expNo: s.expNo,
+              title: s.title,
+              grade: Number(s.grade),
+              remarks: s.remarks || '',
+              gradedAt: s.submittedAt
+            };
+          });
+
+        setPendingSubmissions(pending);
+        setGradedSubmissions(graded);
       }
-
-      // Fetch submissions
-      const { data, error } = await supabase
-        .from('submissions')
-        .select(`
-          *,
-          subjects ( name ),
-          profiles!student_id (
-            name,
-            roll_no,
-            section
-          )
-        `)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      const pending: PendingSubmission[] = (data || [])
-        .filter((s: any) => s.status === 'pending')
-        .map((s: any) => {
-          const studentProfile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
-          const subject = Array.isArray(s.subjects) ? s.subjects[0] : s.subjects;
-          return {
-            id: s.id,
-            studentId: s.student_id,
-            studentName: studentProfile?.name || 'Unknown Student',
-            rollNo: studentProfile?.roll_no || '—',
-            subjectId: s.subject_id,
-            subjectName: subject?.name || (s.subject_id === 'web' ? 'Web Technologies Lab' : 'DBMS Lab'),
-            expNo: s.exp_no,
-            title: s.title,
-            submittedAt: s.submitted_at,
-            daysAgo: Math.max(1, Math.round((Date.now() - new Date(s.submitted_at).getTime()) / (1000 * 60 * 60 * 24))),
-            fileName: s.file_name,
-            fileSize: s.file_size,
-            notes: s.notes
-          };
-        });
-
-      const graded: GradedSubmission[] = (data || [])
-        .filter((s: any) => s.status === 'graded')
-        .map((s: any) => {
-          const studentProfile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
-          const subject = Array.isArray(s.subjects) ? s.subjects[0] : s.subjects;
-          return {
-            id: s.id,
-            studentName: studentProfile?.name || 'Unknown Student',
-            rollNo: studentProfile?.roll_no || '—',
-            subjectName: subject?.name || (s.subject_id === 'web' ? 'Web Technologies Lab' : 'DBMS Lab'),
-            expNo: s.exp_no,
-            title: s.title,
-            grade: Number(s.grade),
-            remarks: s.remarks || '',
-            gradedAt: s.submitted_at
-          };
-        });
-
-      setPendingSubmissions(pending);
-      setGradedSubmissions(graded);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -98,25 +150,18 @@ export default function ReviewSubmissions() {
 
   useEffect(() => {
     document.title = "RecordFlow — Review Submissions";
-    fetchSubmissions();
-  }, []);
+    if (!authLoading) {
+      fetchSubmissions();
+    }
+  }, [user, authLoading]);
 
   const handleGrade = async (submissionId: string, grade: number, remarks: string) => {
     try {
-      const { error } = await supabase
-        .from('submissions')
-        .update({
-          grade,
-          remarks: remarks || null,
-          status: 'graded',
-        })
-        .eq('id', submissionId);
+      const result = await gradeSubmission(submissionId, grade, remarks);
+      if (!result.success) throw new Error(result.error);
 
-      if (error) throw error;
-
-      // Refresh local page data and global dashboard context data
+      // Refresh local page data
       await fetchSubmissions();
-      await refreshData();
     } catch (err: any) {
       alert(`Error grading submission: ${err.message}`);
     }

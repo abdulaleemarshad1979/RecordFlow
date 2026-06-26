@@ -5,50 +5,77 @@ import { subjects, Submission } from '../../data/mockData';
 import { useDashboard } from '../../hooks/useDashboard';
 import StatusBadge from '../../components/dashboard/StatusBadge';
 import EmptyState from '../../components/dashboard/EmptyState';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function MyRecords() {
+  const { user, isLoading: authLoading } = useAuth();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
+
     const fetchSubmissions = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (isSupabaseConfigured) {
+          const { data, error } = await supabase
+            .from('submissions')
+            .select(`
+              *,
+              subjects (
+                name,
+                faculty
+              )
+            `)
+            .eq('student_id', user.id)        // ← explicit filter matching RLS
+            .order('created_at', { ascending: false });
 
-        const { data, error } = await supabase
-          .from('submissions')
-          .select(`
-            *,
-            subjects (
-              name,
-              faculty
-            )
-          `)
-          .eq('student_id', user.id)        // ← explicit filter matching RLS
-          .order('created_at', { ascending: false });
+          if (error) throw error;
+          
+          const mappedData: Submission[] = (data || []).map((db: any) => ({
+            id: db.id,
+            subjectId: db.subject_id,
+            expNo: db.exp_no,
+            title: db.title,
+            faculty: db.faculty,
+            submittedAt: db.submitted_at,
+            status: db.status,
+            grade: db.grade !== null ? Number(db.grade) : null,
+            remarks: db.remarks,
+            file_name: db.file_name,
+            file_size: db.file_size,
+            notes: db.notes
+          }));
 
-        if (error) throw error;
-        
-        const mappedData: Submission[] = (data || []).map((db: any) => ({
-          id: db.id,
-          subjectId: db.subject_id,
-          expNo: db.exp_no,
-          title: db.title,
-          faculty: db.faculty,
-          submittedAt: db.submitted_at,
-          status: db.status,
-          grade: db.grade !== null ? Number(db.grade) : null,
-          remarks: db.remarks,
-          file_name: db.file_name,
-          file_size: db.file_size,
-          notes: db.notes
-        }));
-
-        setSubmissions(mappedData);
+          setSubmissions(mappedData);
+        } else {
+          // LocalStorage fallback
+          const localSubs = JSON.parse(localStorage.getItem('rf_submissions') || '[]');
+          const filtered = localSubs
+            .filter((s: any) => s.studentId === user.id)
+            .map((s: any) => ({
+              id: s.id,
+              subjectId: s.subjectId,
+              expNo: s.expNo,
+              title: s.title,
+              faculty: s.faculty,
+              submittedAt: s.submittedAt,
+              status: s.status,
+              grade: s.grade !== null ? Number(s.grade) : null,
+              remarks: s.remarks,
+              file_name: s.fileName || '',
+              file_size: s.fileSize || '',
+              notes: s.notes
+            }));
+          setSubmissions(filtered);
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -57,21 +84,28 @@ export default function MyRecords() {
     };
 
     fetchSubmissions();
-  }, []);
+  }, [user, authLoading]);
 
   const handleViewPDF = async (filePath: string) => {
-    const { data, error } = await supabase.storage
-      .from('records')
-      .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
-
-    if (error) {
-      console.error('Signed URL error:', error);
-      alert(`Could not open file: ${error.message}`);
+    if (!isSupabaseConfigured) {
+      // LocalStorage fallback: open a placeholder PDF
+      window.open('https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', '_blank');
       return;
     }
 
-    if (data?.signedUrl) {
-      window.open(data.signedUrl, '_blank');
+    try {
+      const { data, error } = await supabase.storage
+        .from('records')
+        .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
+
+      if (error) throw error;
+
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
+      }
+    } catch (err: any) {
+      console.error('Signed URL error:', err);
+      alert(`Could not open file: ${err.message || err}`);
     }
   };
 

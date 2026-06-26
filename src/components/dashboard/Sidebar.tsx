@@ -23,12 +23,13 @@ interface SidebarProps {
 
 export default function Sidebar({ role }: SidebarProps) {
   const { isSidebarOpen, closeSidebar } = useDashboard();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     closeSidebar();
+    await logout();
     navigate('/login');
   };
 

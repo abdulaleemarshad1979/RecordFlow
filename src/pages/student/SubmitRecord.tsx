@@ -5,12 +5,14 @@ import { UploadCloud, FileText, X, CheckCircle2, ChevronRight, Save } from 'luci
 import { subjects } from '../../data/mockData';
 import Button from '../../components/ui/Button';
 import { useDashboard } from '../../hooks/useDashboard';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function SubmitRecord() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { refreshData } = useDashboard();
+  const { refreshData, submitRecord } = useDashboard();
+  const { user } = useAuth();
 
   // Set document title
   useEffect(() => {
@@ -94,50 +96,46 @@ export default function SubmitRecord() {
     setError(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // 1. Upload file to Supabase Storage
-      const timestamp = Date.now();
-      const filePath = `${user.id}/${subjectId}/${expNo}_${timestamp}.pdf`;
+      let filePath = '';
+      if (isSupabaseConfigured) {
+        // 1. Upload file to Supabase Storage
+        const timestamp = Date.now();
+        filePath = `${user.id}/${subjectId}/${expNo}_${timestamp}.pdf`;
 
-      const { data: fileData, error: uploadError } = await supabase.storage
-        .from('records')
-        .upload(filePath, file, {
-          contentType: 'application/pdf',
-          upsert: false,
-        });
+        const { data: fileData, error: uploadError } = await supabase.storage
+          .from('records')
+          .upload(filePath, file, {
+            contentType: 'application/pdf',
+            upsert: false,
+          });
 
-      if (uploadError) {
-        console.error('Storage upload error:', uploadError);
-        throw new Error(`Upload failed: ${uploadError.message}`);
+        if (uploadError) {
+          console.error('Storage upload error:', uploadError);
+          throw new Error(`Upload failed: ${uploadError.message}`);
+        }
+      } else {
+        filePath = `mock/${user.id}/${subjectId}/${expNo}_${Date.now()}.pdf`;
       }
 
-      // 2. Insert the submission row into Postgres
-      const { error: insertError } = await supabase
-        .from('submissions')
-        .insert({
-          student_id: user.id,
-          subject_id: subjectId,
-          exp_no: Number(expNo),
-          title: title,
-          faculty: faculty,
-          submitted_at: new Date().toISOString().split('T')[0],
-          status: 'pending',
-          file_name: filePath,           // store the storage PATH, not the display name
-          file_size: formatFileSize(file.size),
-          notes: notes || null,
-        });
+      // 2. Insert submission (using dashboard context submitRecord helper which handles both Supabase and LocalStorage modes)
+      const res = await submitRecord(
+        subjectId,
+        Number(expNo),
+        title,
+        notes,
+        filePath,
+        formatFileSize(file.size)
+      );
 
-      if (insertError) {
-        console.error('DB insert error:', insertError);
-        throw new Error(`Database error: ${insertError.message}`);
+      if (!res.success) {
+        throw new Error(res.error || 'Submission failed');
       }
 
       // 3. Success
       setIsSuccess(true);
       resetForm();
-      await refreshData();
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {

@@ -4,7 +4,7 @@ import { FileText, Pencil, Loader2, ArrowRight } from 'lucide-react';
 import { PendingSubmission } from '../../data/mockData';
 import GradeInput from './GradeInput';
 import Button from '../ui/Button';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface ReviewCardProps {
   submission: PendingSubmission;
@@ -19,6 +19,10 @@ const ReviewCardComponent = ({ submission, onGradeSubmit }: ReviewCardProps) => 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleViewSubmission = async (filePath: string) => {
+    if (!isSupabaseConfigured) {
+      window.open('https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', '_blank');
+      return;
+    }
     try {
       const { data, error } = await supabase.storage
         .from('records')
