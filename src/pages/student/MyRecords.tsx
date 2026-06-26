@@ -1,13 +1,79 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Eye, Download, X, FileSearch, Calendar, User, Tag } from 'lucide-react';
+import { Eye, Download, X, FileSearch, Calendar, User, Tag, FileText } from 'lucide-react';
 import { subjects, Submission } from '../../data/mockData';
 import { useDashboard } from '../../hooks/useDashboard';
 import StatusBadge from '../../components/dashboard/StatusBadge';
 import EmptyState from '../../components/dashboard/EmptyState';
+import { supabase } from '../../lib/supabase';
 
 export default function MyRecords() {
-  const { submissions } = useDashboard();
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSubmissions = async () => {
+      setLoading(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from('submissions')
+          .select(`
+            *,
+            subjects (
+              name,
+              faculty
+            )
+          `)
+          .eq('student_id', user.id)        // ← explicit filter matching RLS
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        
+        const mappedData: Submission[] = (data || []).map((db: any) => ({
+          id: db.id,
+          subjectId: db.subject_id,
+          expNo: db.exp_no,
+          title: db.title,
+          faculty: db.faculty,
+          submittedAt: db.submitted_at,
+          status: db.status,
+          grade: db.grade !== null ? Number(db.grade) : null,
+          remarks: db.remarks,
+          file_name: db.file_name,
+          file_size: db.file_size,
+          notes: db.notes
+        }));
+
+        setSubmissions(mappedData);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSubmissions();
+  }, []);
+
+  const handleViewPDF = async (filePath: string) => {
+    const { data, error } = await supabase.storage
+      .from('records')
+      .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
+
+    if (error) {
+      console.error('Signed URL error:', error);
+      alert(`Could not open file: ${error.message}`);
+      return;
+    }
+
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank');
+    }
+  };
 
   // Set document title
   useEffect(() => {
@@ -27,10 +93,24 @@ export default function MyRecords() {
     });
   }, [selectedSubject, selectedStatus, submissions]);
 
-  // Handle simulated downloads
+  // Handle file downloads/views via signed URL
   const handleDownload = (sub: Submission) => {
-    alert(`Downloading evaluated file: ${sub.title.replace(/\s+/g, '_')}_graded.pdf`);
+    if (sub.file_name) {
+      handleViewPDF(sub.file_name);
+    } else {
+      alert(`Downloading evaluated file: ${sub.title.replace(/\s+/g, '_')}_graded.pdf`);
+    }
   };
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-48">
+      <div className="w-6 h-6 border-2 border-[#3B82F6] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="text-red-400 text-sm text-center py-8 font-satoshi">{error}</div>
+  );
 
   return (
     <div className="flex flex-col gap-6 pb-12">
@@ -127,6 +207,16 @@ export default function MyRecords() {
                       </td>
                       <td className="py-4 px-6 text-right">
                         <div className="inline-flex items-center gap-2">
+                          {sub.file_name && (
+                            <button
+                              onClick={() => handleViewPDF(sub.file_name!)}
+                              className="w-7 h-7 rounded hover:bg-white/5 text-slate-400 hover:text-white transition-colors flex items-center justify-center cursor-pointer"
+                              title="View PDF File"
+                              data-interactive="true"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => setSelectedSubmission(sub)}
                             className="w-7 h-7 rounded hover:bg-white/5 text-slate-400 hover:text-white transition-colors flex items-center justify-center cursor-pointer"
@@ -198,6 +288,16 @@ export default function MyRecords() {
                     </div>
 
                     <div className="flex items-center gap-3">
+                      {sub.file_name && (
+                        <button
+                          onClick={() => handleViewPDF(sub.file_name!)}
+                          className="text-xs text-slate-400 hover:text-white font-satoshi font-semibold flex items-center gap-1 cursor-pointer"
+                          data-interactive="true"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>PDF</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => setSelectedSubmission(sub)}
                         className="text-xs text-[#3B82F6] hover:text-[#60A5FA] font-satoshi font-semibold flex items-center gap-1 cursor-pointer"

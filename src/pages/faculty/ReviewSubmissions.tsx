@@ -3,14 +3,124 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Search, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { useDashboard } from '../../hooks/useDashboard';
 import ReviewCard from '../../components/dashboard/ReviewCard';
+import { supabase } from '../../lib/supabase';
+import { PendingSubmission, GradedSubmission } from '../../data/mockData';
 
 export default function ReviewSubmissions() {
-  const { pendingSubmissions, gradedSubmissions, gradeSubmission } = useDashboard();
+  const { refreshData } = useDashboard();
+  const [pendingSubmissions, setPendingSubmissions] = useState<PendingSubmission[]>([]);
+  const [gradedSubmissions, setGradedSubmissions] = useState<GradedSubmission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Set document title
+  const fetchSubmissions = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Verify this user is actually faculty
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role, name')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || profile?.role !== 'faculty') {
+        setError('Access denied');
+        return;
+      }
+
+      // Fetch submissions
+      const { data, error } = await supabase
+        .from('submissions')
+        .select(`
+          *,
+          subjects ( name ),
+          profiles!student_id (
+            name,
+            roll_no,
+            section
+          )
+        `)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const pending: PendingSubmission[] = (data || [])
+        .filter((s: any) => s.status === 'pending')
+        .map((s: any) => {
+          const studentProfile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
+          const subject = Array.isArray(s.subjects) ? s.subjects[0] : s.subjects;
+          return {
+            id: s.id,
+            studentId: s.student_id,
+            studentName: studentProfile?.name || 'Unknown Student',
+            rollNo: studentProfile?.roll_no || '—',
+            subjectId: s.subject_id,
+            subjectName: subject?.name || (s.subject_id === 'web' ? 'Web Technologies Lab' : 'DBMS Lab'),
+            expNo: s.exp_no,
+            title: s.title,
+            submittedAt: s.submitted_at,
+            daysAgo: Math.max(1, Math.round((Date.now() - new Date(s.submitted_at).getTime()) / (1000 * 60 * 60 * 24))),
+            fileName: s.file_name,
+            fileSize: s.file_size,
+            notes: s.notes
+          };
+        });
+
+      const graded: GradedSubmission[] = (data || [])
+        .filter((s: any) => s.status === 'graded')
+        .map((s: any) => {
+          const studentProfile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
+          const subject = Array.isArray(s.subjects) ? s.subjects[0] : s.subjects;
+          return {
+            id: s.id,
+            studentName: studentProfile?.name || 'Unknown Student',
+            rollNo: studentProfile?.roll_no || '—',
+            subjectName: subject?.name || (s.subject_id === 'web' ? 'Web Technologies Lab' : 'DBMS Lab'),
+            expNo: s.exp_no,
+            title: s.title,
+            grade: Number(s.grade),
+            remarks: s.remarks || '',
+            gradedAt: s.submitted_at
+          };
+        });
+
+      setPendingSubmissions(pending);
+      setGradedSubmissions(graded);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     document.title = "RecordFlow — Review Submissions";
+    fetchSubmissions();
   }, []);
+
+  const handleGrade = async (submissionId: string, grade: number, remarks: string) => {
+    try {
+      const { error } = await supabase
+        .from('submissions')
+        .update({
+          grade,
+          remarks: remarks || null,
+          status: 'graded',
+        })
+        .eq('id', submissionId);
+
+      if (error) throw error;
+
+      // Refresh local page data and global dashboard context data
+      await fetchSubmissions();
+      await refreshData();
+    } catch (err: any) {
+      alert(`Error grading submission: ${err.message}`);
+    }
+  };
 
   // Filter states
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
@@ -37,6 +147,16 @@ export default function ReviewSubmissions() {
         return sortOrder === 'oldest' ? timeA - timeB : timeB - timeA;
       });
   }, [pendingSubmissions, selectedSubject, searchQuery, sortOrder]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-48">
+      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="text-red-400 text-sm text-center py-8 font-satoshi">{error}</div>
+  );
 
   return (
     <div className="flex flex-col gap-6 pb-12">
@@ -103,7 +223,7 @@ export default function ReviewSubmissions() {
                 <ReviewCard
                   key={sub.id}
                   submission={sub}
-                  onGradeSubmit={gradeSubmission}
+                  onGradeSubmit={handleGrade}
                 />
               ))}
             </AnimatePresence>

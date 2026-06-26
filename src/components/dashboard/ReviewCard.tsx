@@ -4,6 +4,7 @@ import { FileText, Pencil, Loader2, ArrowRight } from 'lucide-react';
 import { PendingSubmission } from '../../data/mockData';
 import GradeInput from './GradeInput';
 import Button from '../ui/Button';
+import { supabase } from '../../lib/supabase';
 
 interface ReviewCardProps {
   submission: PendingSubmission;
@@ -16,6 +17,22 @@ const ReviewCardComponent = ({ submission, onGradeSubmit }: ReviewCardProps) => 
   const [isValidGrade, setIsValidGrade] = useState(false);
   const [isRemarkExpanded, setIsRemarkExpanded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleViewSubmission = async (filePath: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('records')
+        .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
+
+      if (error) throw error;
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
+      }
+    } catch (err: any) {
+      console.error('Error generating signed URL:', err);
+      alert(`Could not open file: ${err.message || err}`);
+    }
+  };
 
   const handleValidationChange = (isValid: boolean) => {
     setIsValidGrade(isValid);
@@ -106,7 +123,7 @@ const ReviewCardComponent = ({ submission, onGradeSubmit }: ReviewCardProps) => 
       <div className="flex items-center gap-3 select-none">
         <button
           type="button"
-          onClick={() => alert(`Opening student upload: ${submission.fileName}`)}
+          onClick={() => handleViewSubmission(submission.fileName)}
           className="h-8 border border-white/10 hover:border-accent-blue/30 hover:bg-[#3B82F6]/[0.08] px-3 rounded-[6px] text-xs font-semibold font-satoshi text-slate-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
           data-interactive="true"
         >

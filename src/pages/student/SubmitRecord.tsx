@@ -5,11 +5,12 @@ import { UploadCloud, FileText, X, CheckCircle2, ChevronRight, Save } from 'luci
 import { subjects } from '../../data/mockData';
 import Button from '../../components/ui/Button';
 import { useDashboard } from '../../hooks/useDashboard';
+import { supabase } from '../../lib/supabase';
 
 export default function SubmitRecord() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { submitRecord } = useDashboard();
+  const { refreshData } = useDashboard();
 
   // Set document title
   useEffect(() => {
@@ -23,7 +24,8 @@ export default function SubmitRecord() {
   const [submissionType, setSubmissionType] = useState('Lab Record');
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
-  const [file, setFile] = useState<{ name: string; size: string } | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // UI state
   const [isDragOver, setIsDragOver] = useState(false);
@@ -69,12 +71,14 @@ export default function SubmitRecord() {
     }
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const processFile = (selectedFile: File) => {
-    const sizeInMB = (selectedFile.size / (1024 * 1024)).toFixed(1);
-    setFile({
-      name: selectedFile.name,
-      size: `${sizeInMB} MB`
-    });
+    setFile(selectedFile);
   };
 
   const handleRemoveFile = () => {
@@ -87,13 +91,57 @@ export default function SubmitRecord() {
     if (!file || !title) return;
 
     setIsSubmitting(true);
-    const res = await submitRecord(subjectId, expNo, title, notes, file.name, file.size);
-    setIsSubmitting(false);
+    setError(null);
 
-    if (res.success) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // 1. Upload file to Supabase Storage
+      const timestamp = Date.now();
+      const filePath = `${user.id}/${subjectId}/${expNo}_${timestamp}.pdf`;
+
+      const { data: fileData, error: uploadError } = await supabase.storage
+        .from('records')
+        .upload(filePath, file, {
+          contentType: 'application/pdf',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      // 2. Insert the submission row into Postgres
+      const { error: insertError } = await supabase
+        .from('submissions')
+        .insert({
+          student_id: user.id,
+          subject_id: subjectId,
+          exp_no: Number(expNo),
+          title: title,
+          faculty: faculty,
+          submitted_at: new Date().toISOString().split('T')[0],
+          status: 'pending',
+          file_name: filePath,           // store the storage PATH, not the display name
+          file_size: formatFileSize(file.size),
+          notes: notes || null,
+        });
+
+      if (insertError) {
+        console.error('DB insert error:', insertError);
+        throw new Error(`Database error: ${insertError.message}`);
+      }
+
+      // 3. Success
       setIsSuccess(true);
-    } else {
-      alert(`Error submitting record: ${res.error || 'Please try again.'}`);
+      resetForm();
+      await refreshData();
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -102,6 +150,7 @@ export default function SubmitRecord() {
     setNotes('');
     setFile(null);
     setIsSuccess(false);
+    setError(null);
   };
 
   return (
@@ -328,7 +377,7 @@ export default function SubmitRecord() {
                             {file.name}
                           </span>
                           <span className="text-[10px] text-slate-500 mt-0.5">
-                            {file.size}
+                            {formatFileSize(file.size)}
                           </span>
                         </div>
                       </div>
@@ -364,30 +413,35 @@ export default function SubmitRecord() {
               </div>
 
               {/* Submit Buttons */}
-              <div className="flex items-center gap-4 mt-2">
-                <Button
-                  type="submit"
-                  variant="primary"
-                  loading={isSubmitting}
-                  disabled={!file || !title || isSubmitting}
-                  className="flex-1 h-11 rounded-[10px] text-xs font-semibold select-none cursor-pointer flex items-center justify-center"
-                  data-interactive="true"
-                >
-                  {isSubmitting ? 'Submitting...' : 'Submit Record'}
-                </Button>
-                
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => navigate('/student/records')}
-                  className="h-11 rounded-[10px] text-xs font-semibold select-none cursor-pointer px-5"
-                  data-interactive="true"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <Save className="w-3.5 h-3.5" />
-                    Save as draft
-                  </span>
-                </Button>
+              <div className="flex flex-col gap-2 mt-2 w-full">
+                <div className="flex items-center gap-4 w-full">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    loading={isSubmitting}
+                    disabled={!file || !title || isSubmitting}
+                    className="flex-1 h-11 rounded-[10px] text-xs font-semibold select-none cursor-pointer flex items-center justify-center"
+                    data-interactive="true"
+                  >
+                    {isSubmitting ? 'Submitting...' : 'Submit Record'}
+                  </Button>
+                  
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => navigate('/student/records')}
+                    className="h-11 rounded-[10px] text-xs font-semibold select-none cursor-pointer px-5"
+                    data-interactive="true"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Save className="w-3.5 h-3.5" />
+                      Save as draft
+                    </span>
+                  </Button>
+                </div>
+                {error && (
+                  <p className="text-red-400 text-sm mt-2 font-satoshi text-center md:text-left">{error}</p>
+                )}
               </div>
             </motion.form>
           )}
