@@ -1,4 +1,4 @@
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
@@ -13,17 +13,20 @@ CREATE TABLE public.profiles (
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
 CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile" ON public.profiles
   FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
 
-CREATE TABLE public.subjects (
+CREATE TABLE IF NOT EXISTS public.subjects (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   faculty TEXT NOT NULL,
@@ -32,6 +35,7 @@ CREATE TABLE public.subjects (
 
 ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Subjects are viewable by authenticated users" ON public.subjects;
 CREATE POLICY "Subjects are viewable by authenticated users" ON public.subjects
   FOR SELECT USING (auth.role() = 'authenticated');
 
@@ -43,7 +47,7 @@ INSERT INTO public.subjects (id, name, faculty, total) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 
-CREATE TABLE public.submissions (
+CREATE TABLE IF NOT EXISTS public.submissions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   student_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   subject_id TEXT REFERENCES public.subjects(id) NOT NULL,
@@ -62,9 +66,11 @@ CREATE TABLE public.submissions (
 
 ALTER TABLE public.submissions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Students can view their own submissions" ON public.submissions;
 CREATE POLICY "Students can view their own submissions" ON public.submissions
   FOR SELECT USING (auth.uid() = student_id);
 
+DROP POLICY IF EXISTS "Faculty can view submissions assigned to their subjects" ON public.submissions;
 CREATE POLICY "Faculty can view submissions assigned to their subjects" ON public.submissions
   FOR SELECT USING (
     EXISTS (
@@ -73,9 +79,11 @@ CREATE POLICY "Faculty can view submissions assigned to their subjects" ON publi
     )
   );
 
+DROP POLICY IF EXISTS "Students can insert their own submissions" ON public.submissions;
 CREATE POLICY "Students can insert their own submissions" ON public.submissions
   FOR INSERT WITH CHECK (auth.uid() = student_id);
 
+DROP POLICY IF EXISTS "Faculty can update submissions (for grading)" ON public.submissions;
 CREATE POLICY "Faculty can update submissions (for grading)" ON public.submissions
   FOR UPDATE USING (
     EXISTS (
