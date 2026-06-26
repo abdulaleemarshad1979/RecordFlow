@@ -74,7 +74,7 @@ export default function Login() {
     <>
       <CustomCursor />
       
-      <div className="min-h-screen bg-[#050816] flex text-[#F8FAFC] font-sans selection:bg-accent-blue/30 overflow-hidden relative">
+      <div className="min-h-screen bg-[#050816] flex text-[#F8FAFC] font-sans selection:bg-accent-blue/30 overflow-y-auto lg:overflow-hidden relative">
         {/* Left Panel (Desktop only) */}
         <motion.div
           initial={{ x: -40, opacity: 0 }}

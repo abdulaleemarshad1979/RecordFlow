@@ -145,7 +145,7 @@ export default function Signup() {
     <>
       <CustomCursor />
       
-      <div className="min-h-screen bg-[#050816] flex text-[#F8FAFC] font-sans selection:bg-accent-blue/30 overflow-hidden relative">
+      <div className="min-h-screen bg-[#050816] flex text-[#F8FAFC] font-sans selection:bg-accent-blue/30 overflow-y-auto lg:overflow-hidden relative">
         {/* Left Panel (Desktop only) */}
         <motion.div
           initial={{ x: -40, opacity: 0 }}
@@ -208,7 +208,7 @@ export default function Signup() {
         </motion.div>
 
         {/* Right Panel (Form / Success State) */}
-        <div className="flex-1 flex items-center justify-center p-6 lg:p-16 relative overflow-y-auto max-h-screen">
+        <div className="flex-1 flex items-center justify-center p-6 lg:p-16 relative lg:overflow-y-auto lg:max-h-screen">
           {/* Subtle Glows */}
           <div className="absolute top-1/4 left-1/3 w-96 h-96 rounded-full bg-accent-blue/5 blur-[120px] pointer-events-none" />
           <div className="absolute bottom-1/4 right-1/3 w-96 h-96 rounded-full bg-accent-cyan/5 blur-[120px] pointer-events-none" />
